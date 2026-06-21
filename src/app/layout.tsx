@@ -4,6 +4,7 @@ import { Playfair_Display, PT_Sans } from 'next/font/google';
 import './globals.css';
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/AuthContext';
+import ClientLayout from '@/components/ClientLayout';
 
 const playfair = Playfair_Display({ 
   subsets: ['latin'], 
@@ -35,11 +36,13 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body className={`${playfair.variable} ${ptSans.variable} font-body antialiased selection:bg-accent/30 min-h-screen flex flex-col`}>
-        <AuthProvider>
-          <CartProvider>
-            {children}
-          </CartProvider>
-        </AuthProvider>
+        <ClientLayout>
+          <AuthProvider>
+            <CartProvider>
+              {children}
+            </CartProvider>
+          </AuthProvider>
+        </ClientLayout>
       </body>
     </html>
   );

@@ -26,9 +26,8 @@ service cloud.firestore {
       allow update, delete: if request.auth != null && 
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
       
-      // Allow querying for admin
-      allow list: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      // Allow authenticated users to list queries; document-level read rules enforce access
+      allow list: if request.auth != null;
     }
   }
 }

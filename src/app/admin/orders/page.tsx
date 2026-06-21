@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { Search, Eye, Mail, Phone, MapPin, ShoppingBag, Package, ExternalLink } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+import { useDebounce } from '@/hooks/use-debounce';
 
 interface Order {
   id: string;
@@ -49,8 +50,13 @@ export default function AdminOrdersPage() {
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [inputValue, setInputValue] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  const debouncedSetSearchQuery = useDebounce((q: string) => {
+    setSearchQuery(q);
+  }, 300);
 
   useEffect(() => {
     fetchOrders();
@@ -157,8 +163,11 @@ export default function AdminOrdersPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search by email, name, product, or order ID..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={inputValue}
+                onChange={(e) => {
+                  setInputValue(e.target.value);
+                  debouncedSetSearchQuery(e.target.value);
+                }}
                 className="pl-10 h-11 rounded-xl"
               />
             </div>
