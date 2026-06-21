@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
-import { FileText, CreditCard, ShieldCheck, Package, Loader2 } from 'lucide-react';
+import { CreditCard, ShieldCheck, Package, Loader2, ArrowRight } from 'lucide-react';
 import { getProductById } from '@/lib/products';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -26,14 +26,12 @@ function CheckoutContent() {
   
   const product = productId ? getProductById(productId) : null;
   
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [step, setStep] = useState<'form' | 'payment' | 'success'>('form');
   const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [email, setEmail] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
-  const [orderSubmitted, setOrderSubmitted] = useState(false);
 
-  // Form fields
+  const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
@@ -55,12 +53,23 @@ function CheckoutContent() {
     };
   }, []);
 
-  const handlePayment = () => {
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    
     if (!email || !email.includes('@')) {
-      setPaymentError('Please enter a valid email address');
-      return;
+      setPaymentError('Please enter a valid email address')
+      return
     }
+    if (!fullName || !phone || !address) {
+      setPaymentError('Please fill in all required fields.')
+      return
+    }
+    
+    setPaymentError(null)
+    setStep('payment')
+  }
 
+  const handlePayment = () => {
     if (!window.PaystackPop) {
       setPaymentError('Paystack failed to load. Please refresh and try again.');
       return;
@@ -77,19 +86,23 @@ function CheckoutContent() {
       ref: 'PAY-' + Date.now(),
       metadata: {
         custom_fields: [
-          { display_name: 'Product', variable_name: 'product', value: productName }
+          { display_name: 'Product', variable_name: 'product', value: productName },
+          { display_name: 'Customer Name', variable_name: 'customer_name', value: fullName },
+          { display_name: 'Phone', variable_name: 'phone', value: phone }
         ]
       },
       onSuccess: async (transaction: any) => {
         setIsProcessing(false);
-        setPaymentSuccess(true);
+        await submitOrder(transaction);
       },
       onCancel: () => {
         setIsProcessing(false);
+        setStep('form');
         setPaymentError('Payment was cancelled');
       },
       onError: (error: any) => {
         setIsProcessing(false);
+        setStep('form');
         setPaymentError(error.message || 'Payment failed. Please try again.');
       }
     });
@@ -97,14 +110,7 @@ function CheckoutContent() {
     handler.openIframe();
   };
 
-  const handleSubmitOrder = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    
-    if (!fullName || !phone || !address) {
-      setPaymentError('Please fill in all required fields.')
-      return
-    }
-
+  const submitOrder = async (transaction: any) => {
     setIsSubmittingOrder(true)
     setPaymentError(null)
 
@@ -118,15 +124,16 @@ function CheckoutContent() {
         productName: productName,
         amount: price,
         status: 'pending',
-        paymentReference: 'PAY-' + Date.now(),
+        paymentReference: transaction?.ref || 'PAY-' + Date.now(),
+        paymentStatus: 'success',
         createdAt: serverTimestamp(),
         notes: notes || null
       }
 
       await addDoc(collection(db, 'orders'), orderData)
-      setOrderSubmitted(true)
+      setStep('success')
     } catch (error: any) {
-      setPaymentError(error.message || 'Failed to submit order. Please try again.')
+      setPaymentError(error.message || 'Payment succeeded but failed to save order. Please contact support.')
     } finally {
       setIsSubmittingOrder(false)
     }
@@ -147,7 +154,7 @@ function CheckoutContent() {
     );
   }
 
-  if (orderSubmitted) {
+  if (step === 'success') {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <Header />
@@ -159,10 +166,10 @@ function CheckoutContent() {
                 <ShieldCheck className="w-8 h-8" />
               </div>
               <h1 className="font-headline text-4xl md:text-5xl font-bold tracking-tight text-foreground">
-                Order Submitted Successfully!
+                Order Confirmed!
               </h1>
               <p className="text-muted-foreground text-lg md:text-xl font-light">
-                Your order has been received. We will contact you shortly to confirm.
+                Payment successful and your order has been received.
               </p>
               <div className="w-20 h-1 bg-accent mx-auto mt-4 rounded-full"></div>
             </div>
@@ -196,7 +203,7 @@ function CheckoutContent() {
     );
   }
 
-  if (paymentSuccess) {
+  if (step === 'payment') {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <Header />
@@ -204,14 +211,14 @@ function CheckoutContent() {
         <main className="flex-grow pt-24 pb-20 bg-gradient-to-tr from-[#FAF8F5] via-white to-[#F5F8FA]">
           <div className="container mx-auto px-4 max-w-3xl">
             <div className="text-center mb-10 space-y-3">
-              <div className="inline-flex p-3 bg-emerald-100 text-emerald-600 rounded-full mb-2">
-                <ShieldCheck className="w-8 h-8" />
+              <div className="inline-flex p-3 bg-primary/10 text-primary rounded-full mb-2">
+                <CreditCard className="w-8 h-8" />
               </div>
               <h1 className="font-headline text-4xl md:text-5xl font-bold tracking-tight text-foreground">
-                Payment Successful!
+                Complete Payment
               </h1>
               <p className="text-muted-foreground text-lg md:text-xl font-light">
-                Complete your order by filling the form below
+                Finalize your order with secure payment
               </p>
               <div className="w-20 h-1 bg-accent mx-auto mt-4 rounded-full"></div>
             </div>
@@ -222,84 +229,58 @@ function CheckoutContent() {
               </div>
             )}
 
-            <form onSubmit={handleSubmitOrder} className="bg-white rounded-3xl border border-slate-100 shadow-xl p-8 md:p-10 space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName" className="text-sm font-semibold text-slate-700">Full Name *</Label>
-                  <Input
-                    id="fullName"
-                    type="text"
-                    placeholder="Enter your full name"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="h-12 bg-slate-50 border-slate-200 rounded-xl"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone" className="text-sm font-semibold text-slate-700">Phone Number *</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+233 24 000 0000"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="h-12 bg-slate-50 border-slate-200 rounded-xl"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="address" className="text-sm font-semibold text-slate-700">Delivery Address *</Label>
-                  <Textarea
-                    id="address"
-                    placeholder="Enter your full delivery address"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    className="min-h-[100px] bg-slate-50 border-slate-200 rounded-xl"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="notes" className="text-sm font-semibold text-slate-700">Additional Notes (Optional)</Label>
-                  <Textarea
-                    id="notes"
-                    placeholder="Any special instructions or preferences..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="min-h-[80px] bg-slate-50 border-slate-200 rounded-xl"
-                  />
-                </div>
-              </div>
-
-              <div className="border-t pt-6">
-                <div className="flex justify-between items-center mb-6">
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-xl p-8 md:p-10">
+              <div className="space-y-4 mb-8">
+                <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Product</span>
                   <span className="font-bold">{productName}</span>
                 </div>
-                <div className="flex justify-between items-center mb-6">
-                  <span className="text-muted-foreground">Total Paid</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Customer</span>
+                  <span className="font-medium">{fullName}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Email</span>
+                  <span className="font-medium">{email}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Total</span>
                   <span className="font-bold text-2xl">${price.toFixed(2)}</span>
                 </div>
+              </div>
 
+              <div className="border-t pt-6 space-y-4">
                 <Button
-                  type="submit"
-                  disabled={isSubmittingOrder}
+                  onClick={handlePayment}
+                  disabled={isProcessing}
                   className="w-full h-13 rounded-xl bg-primary text-white hover:bg-primary/95 font-semibold text-base shadow-lg shadow-primary/10 gap-2"
                 >
-                  {isSubmittingOrder ? (
+                  {isProcessing ? (
                     <span className="flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Submitting Order...
+                      Processing Payment...
                     </span>
                   ) : (
-                    'Submit Order'
+                    <span className="flex items-center gap-2">
+                      Pay $${price.toFixed(2)} with Paystack
+                      <ArrowRight className="w-4 h-4" />
+                    </span>
                   )}
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setStep('form')}
+                  className="w-full h-12 rounded-xl"
+                >
+                  Back to Form
+                </Button>
               </div>
-            </form>
+
+              <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <ShieldCheck className="w-4 h-4" />
+                <span>Secured by Paystack encryption</span>
+              </div>
+            </div>
           </div>
         </main>
 
@@ -312,63 +293,111 @@ function CheckoutContent() {
     <div className="flex flex-col min-h-screen bg-background">
       <Header />
       
-      <main className="flex-grow pt-24 pb-20">
-        <div className="container mx-auto px-4 max-w-2xl">
+      <main className="flex-grow pt-24 pb-20 bg-gradient-to-tr from-[#FAF8F5] via-white to-[#F5F8FA]">
+        <div className="container mx-auto px-4 max-w-3xl">
           <div className="text-center mb-10 space-y-3">
             <div className="inline-flex p-3 bg-primary/10 text-primary rounded-full mb-2">
-              <CreditCard className="w-8 h-8" />
+              <Package className="w-8 h-8" />
             </div>
             <h1 className="font-headline text-4xl md:text-5xl font-bold tracking-tight text-foreground">
-              Secure Checkout
+              Checkout
             </h1>
             <p className="text-muted-foreground text-lg md:text-xl font-light">
-              Complete payment to proceed with your order
+              Fill in your details to complete your order
             </p>
             <div className="w-20 h-1 bg-accent mx-auto mt-4 rounded-full"></div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-xl p-8">
-            <div className="mb-6 pb-6 border-b">
-              <h3 className="text-lg font-bold mb-2">Order Summary</h3>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">{productName}</span>
-                <span className="font-bold text-2xl">${price.toFixed(2)}</span>
-              </div>
+          {paymentError && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+              {paymentError}
             </div>
+          )}
 
-            {paymentError && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
-                {paymentError}
-              </div>
-            )}
-
+          <form onSubmit={handleFormSubmit} className="bg-white rounded-3xl border border-slate-100 shadow-xl p-8 md:p-10 space-y-6">
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Email Address</label>
-                <input
+                <Label htmlFor="email" className="text-sm font-semibold text-slate-700">Email Address *</Label>
+                <Input
+                  id="email"
                   type="email"
+                  placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="h-12 bg-slate-50 border-slate-200 rounded-xl"
                   required
                 />
               </div>
-              
-              <button
-                onClick={handlePayment}
-                disabled={isProcessing || !email}
-                className="w-full bg-primary hover:bg-primary/90 text-white py-4 rounded-xl font-bold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isProcessing ? 'Processing...' : `Pay $${price.toFixed(2)} with Paystack`}
-              </button>
+
+              <div className="space-y-2">
+                <Label htmlFor="fullName" className="text-sm font-semibold text-slate-700">Full Name *</Label>
+                <Input
+                  id="fullName"
+                  type="text"
+                  placeholder="Enter your full name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="h-12 bg-slate-50 border-slate-200 rounded-xl"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="text-sm font-semibold text-slate-700">Phone Number *</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="+233 24 000 0000"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="h-12 bg-slate-50 border-slate-200 rounded-xl"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="address" className="text-sm font-semibold text-slate-700">Delivery Address *</Label>
+                <Textarea
+                  id="address"
+                  placeholder="Enter your full delivery address"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="min-h-[100px] bg-slate-50 border-slate-200 rounded-xl"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes" className="text-sm font-semibold text-slate-700">Additional Notes (Optional)</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Any special instructions or preferences..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="min-h-[80px] bg-slate-50 border-slate-200 rounded-xl"
+                />
+              </div>
             </div>
 
-            <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-              <ShieldCheck className="w-4 h-4" />
-              <span>Secured by Paystack encryption</span>
+            <div className="border-t pt-6">
+              <div className="flex justify-between items-center mb-6">
+                <span className="text-muted-foreground">Product</span>
+                <span className="font-bold">{productName}</span>
+              </div>
+              <div className="flex justify-between items-center mb-6">
+                <span className="text-muted-foreground">Total</span>
+                <span className="font-bold text-2xl">${price.toFixed(2)}</span>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full h-13 rounded-xl bg-primary text-white hover:bg-primary/95 font-semibold text-base shadow-lg shadow-primary/10 gap-2"
+              >
+                Proceed to Payment
+                <ArrowRight className="w-4 h-4" />
+              </Button>
             </div>
-          </div>
+          </form>
         </div>
       </main>
 
