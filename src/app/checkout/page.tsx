@@ -24,6 +24,8 @@ declare global {
 
 const PAYSTACK_SCRIPT_ID = 'paystack-inline-script';
 const PAYSTACK_CURRENCY = 'GHS';
+
+// Note: this is read in the client bundle; ensure it's set in `.env.local`.
 const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY?.trim();
 
 function getPaystackErrorMessage(error: any) {
@@ -38,6 +40,7 @@ function createPaymentReference() {
 function CheckoutContent() {
   const searchParams = useSearchParams();
   const productId = searchParams.get('productId');
+
   const amountParam = searchParams.get('amount');
   const sizeParam = searchParams.get('size');
   const colorParam = searchParams.get('color');
@@ -51,29 +54,46 @@ function CheckoutContent() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPaystackLoading, setIsPaystackLoading] = useState(true);
   const [paystackLoadError, setPaystackLoadError] = useState<string | null>(null);
+  const [isPaystackReady, setIsPaystackReady] = useState(false);
+
 
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
-  const [selectedSize, setSelectedSize] = useState(sizeParam || product?.sizes[0] || '');
-  const [selectedColor, setSelectedColor] = useState(colorParam || product?.colors[0] || '');
+  const [selectedSize, setSelectedSize] = useState(
+    sizeParam || product?.sizes?.[0] || ''
+  );
+  const [selectedColor, setSelectedColor] = useState(
+    colorParam || product?.colors?.[0] || ''
+  );
+
   const [quantity, setQuantity] = useState(Math.max(1, parseInt(quantityParam || '1', 10) || 1));
 
   const [state, handleFormSubmit] = useForm("mqewdvrn");
   const [formSubmitMessage, setFormSubmitMessage] = useState<string | null>(null);
 
-  const price = product?.discountPrice || product?.price || (amountParam ? parseFloat(amountParam) : 0);
+  const price =
+    product?.discountPrice ||
+    product?.price ||
+    (amountParam ? parseFloat(amountParam) : 0);
   const orderAmount = price * quantity;
   const paystackAmount = Math.round(orderAmount * 100);
   const paymentReference = createPaymentReference();
   const productName = product?.name || 'Product Order';
 
+
+
+
   useEffect(() => {
+    // Deterministically mark Paystack as ready/failed based on script load.
     if (window.PaystackPop) {
       setIsPaystackLoading(false);
+      setPaystackLoadError(null);
+      setIsPaystackReady(true);
       return;
     }
+
 
     const existingScript = document.getElementById(PAYSTACK_SCRIPT_ID) as HTMLScriptElement | null;
 
@@ -83,11 +103,24 @@ function CheckoutContent() {
         return;
       }
 
-      existingScript.addEventListener('load', () => setIsPaystackLoading(false), { once: true });
-      existingScript.addEventListener('error', () => {
-        setPaystackLoadError('Unable to load Paystack. Check your connection and try again.');
-        setIsPaystackLoading(false);
-      }, { once: true });
+      existingScript.addEventListener(
+        'load',
+        () => {
+          setIsPaystackLoading(false);
+          setPaystackLoadError(null);
+          setIsPaystackReady(true);
+        },
+        { once: true }
+      );
+      existingScript.addEventListener(
+        'error',
+        () => {
+          setPaystackLoadError('Unable to load Paystack. Check your connection and try again.');
+          setIsPaystackLoading(false);
+          setIsPaystackReady(false);
+        },
+        { once: true }
+      );
       return;
     }
 
@@ -95,10 +128,15 @@ function CheckoutContent() {
     script.id = PAYSTACK_SCRIPT_ID;
     script.src = 'https://js.paystack.co/v2/inline.js';
     script.async = true;
-    script.onload = () => setIsPaystackLoading(false);
+    script.onload = () => {
+      setIsPaystackLoading(false);
+      setPaystackLoadError(null);
+      setIsPaystackReady(true);
+    };
     script.onerror = () => {
       setPaystackLoadError('Unable to load Paystack. Check your connection and try again.');
       setIsPaystackLoading(false);
+      setIsPaystackReady(false);
     };
     document.body.appendChild(script);
 
@@ -135,10 +173,12 @@ function CheckoutContent() {
       return;
     }
 
-    if (isPaystackLoading) {
+    // Deterministic readiness check.
+    if (!isPaystackReady || isPaystackLoading) {
       setPaymentError('Paystack is still loading. Please wait a moment and try again.');
       return;
     }
+
 
     if (!window.PaystackPop || typeof window.PaystackPop.setup !== 'function') {
       setPaymentError('Paystack failed to initialize. Please refresh and try again.');
@@ -356,16 +396,21 @@ function CheckoutContent() {
                 {paymentError}
               </div>
             )}
-            {isPaystackLoading && (
-              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-sm">
-                Loading Paystack securely...
-              </div>
-            )}
+
             {paystackLoadError && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
                 {paystackLoadError}
               </div>
             )}
+
+            {!paystackLoadError && !isPaystackReady && (
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-sm">
+                Loading Paystack securely...
+              </div>
+            )}
+
+
+
 
             <div className="bg-white rounded-3xl border border-slate-100 shadow-xl p-8 md:p-10">
               <div className="space-y-4 mb-8">
@@ -373,6 +418,13 @@ function CheckoutContent() {
                   <span className="text-muted-foreground">Product</span>
                   <span className="font-bold">{productName}</span>
                 </div>
+
+                {!productId && (
+                  <div className="text-xs text-muted-foreground">
+                    Product details were not provided; total is based on cart amount.
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Quantity</span>
                   <span className="font-medium">{quantity}</span>
@@ -393,6 +445,9 @@ function CheckoutContent() {
                   <span className="text-muted-foreground">Email</span>
                   <span className="font-medium">{email}</span>
                 </div>
+
+
+
                 <div className="flex justify-between items-start">
                   <span className="text-muted-foreground">Phone</span>
                   <span className="font-medium text-right">{phone}</span>
