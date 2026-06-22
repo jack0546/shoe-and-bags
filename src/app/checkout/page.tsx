@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/context/AuthContext';
 import { formatCedis } from '@/lib/utils';
+import { useCart } from '@/context/CartContext';
 
 declare global {
   interface Window {
@@ -47,7 +48,10 @@ function CheckoutContent() {
   const quantityParam = searchParams.get('quantity');
   const { user } = useAuth();
 
-  const product = productId ? getProductById(productId) : null;
+   const product = productId ? getProductById(productId) : null;
+  const { cart, clearCart } = useCart();
+  const hasAmount = amountParam !== null && !isNaN(Number(amountParam));
+  const isCartCheckout = !productId && (cart.length > 0 || hasAmount);
 
   const [step, setStep] = useState<'form' | 'payment' | 'success'>('form');
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -68,19 +72,20 @@ function CheckoutContent() {
     colorParam || product?.colors?.[0] || ''
   );
 
-  const [quantity, setQuantity] = useState(Math.max(1, parseInt(quantityParam || '1', 10) || 1));
+  const [quantity, setQuantity] = useState(
+    Math.max(1, parseInt(quantityParam || '1', 10) || 1)
+  );
 
   const [state, handleFormSubmit] = useForm("mqewdvrn");
   const [formSubmitMessage, setFormSubmitMessage] = useState<string | null>(null);
 
-  const price =
-    product?.discountPrice ||
-    product?.price ||
-    (amountParam ? parseFloat(amountParam) : 0);
-  const orderAmount = price * quantity;
+  const price = product?.discountPrice || product?.price || (amountParam ? parseFloat(amountParam) : 0);
+  const cartTotal = isCartCheckout ? cart.reduce((acc, item) => acc + ((item.discountPrice || item.price) * item.quantity), 0) : 0;
+  const orderAmount = isCartCheckout ? cartTotal : price * quantity;
   const paystackAmount = Math.round(orderAmount * 100);
-  const paymentReference = createPaymentReference();
-  const productName = product?.name || 'Product Order';
+  const paymentReferenceRef = useRef(createPaymentReference());
+  const paymentReference = paymentReferenceRef.current;
+  const productName = product?.name || (isCartCheckout ? 'Shopping Bag Order' : 'Product Order');
 
 
 
@@ -269,6 +274,10 @@ function CheckoutContent() {
 
       await addDoc(collection(db, 'orders'), orderData)
 
+      if (isCartCheckout) {
+        clearCart();
+      }
+
       const formData = new FormData();
       formData.append("name", fullName);
       formData.append("email", email);
@@ -294,7 +303,7 @@ function CheckoutContent() {
     }
   }
 
-  if (!product && !amountParam) {
+  if (!product && !isCartCheckout) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <Header />
@@ -419,16 +428,24 @@ function CheckoutContent() {
                   <span className="font-bold">{productName}</span>
                 </div>
 
-                {!productId && (
+                {!productId && isCartCheckout && (
+                  <div className="text-xs text-muted-foreground">
+                    Order contains {cart.length} item{cart.length !== 1 ? 's' : ''} from your shopping bag.
+                  </div>
+                )}
+
+                {!productId && !isCartCheckout && (
                   <div className="text-xs text-muted-foreground">
                     Product details were not provided; total is based on cart amount.
                   </div>
                 )}
 
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Quantity</span>
-                  <span className="font-medium">{quantity}</span>
-                </div>
+                {!isCartCheckout && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Quantity</span>
+                    <span className="font-medium">{quantity}</span>
+                  </div>
+                )}
                 {(selectedSize || selectedColor) && (
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Options</span>
