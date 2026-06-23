@@ -29,6 +29,7 @@ import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 import { useDebounce } from '@/hooks/use-debounce';
 import { formatCedis } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
+import { getProductById, ALL_PRODUCTS } from '@/lib/products';
 
 interface Order {
   id: string;
@@ -38,6 +39,7 @@ interface Order {
   userPhone: string;
   userAddress: string;
   productName: string;
+  productId?: string;
   amount: number;
   quantity?: number;
   selectedSize?: string | null;
@@ -247,7 +249,14 @@ export default function AdminOrdersPage() {
                         <p className="text-xs text-muted-foreground">{order.userEmail}</p>
                       </div>
                     </TableCell>
-                    <TableCell className="max-w-[200px] truncate">{order.productName}</TableCell>
+                    <TableCell className="max-w-[250px]">
+                      <div>
+                        <p className="font-medium truncate">{order.productName}</p>
+                        {order.productId && (
+                          <p className="text-xs text-muted-foreground">ID: {order.productId}</p>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="font-bold">{formatCedis(order.amount)}</TableCell>
                     <TableCell>
                       <Badge className={`${getStatusColor(order.status)} border-0`}>
@@ -330,9 +339,12 @@ export default function AdminOrdersPage() {
                                     <ShoppingBag className="w-4 h-4" /> Order Summary
                                   </h4>
                                   <div className="space-y-2">
-                                    <div className="flex justify-between">
+                                    <div>
                                       <span className="text-muted-foreground">Product</span>
-                                      <span className="font-medium">{selectedOrder.productName}</span>
+                                      <span className="font-medium block truncate">{selectedOrder.productName}</span>
+                                      {selectedOrder.productId && (
+                                        <span className="text-xs text-muted-foreground block">ID: {selectedOrder.productId}</span>
+                                      )}
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-muted-foreground">Quantity</span>

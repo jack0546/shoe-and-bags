@@ -241,6 +241,7 @@ function CheckoutContent() {
         metadata: {
           custom_fields: [
             { display_name: 'Product', variable_name: 'product', value: productName },
+            { display_name: 'Product ID', variable_name: 'product_id', value: productId || '' },
             { display_name: 'Customer Name', variable_name: 'customer_name', value: fullName },
             { display_name: 'Phone', variable_name: 'phone', value: phone },
             { display_name: 'Payment Reference', variable_name: 'payment_reference', value: paymentReference },

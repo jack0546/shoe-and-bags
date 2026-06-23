@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
       userPhone: verifiedData?.metadata?.custom_fields?.find((f: any) => f.variable_name === 'phone')?.value || '',
       userAddress: verifiedData?.metadata?.custom_fields?.find((f: any) => f.variable_name === 'address')?.value || '',
       productName: verifiedData?.metadata?.custom_fields?.find((f: any) => f.variable_name === 'product')?.value || '',
+      productId: verifiedData?.metadata?.custom_fields?.find((f: any) => f.variable_name === 'product_id')?.value || null,
       amount: verifiedAmount,
       quantity: parseInt(verifiedData?.metadata?.custom_fields?.find((f: any) => f.variable_name === 'quantity')?.value) || 1,
       selectedSize: verifiedData?.metadata?.custom_fields?.find((f: any) => f.variable_name === 'size')?.value || null,

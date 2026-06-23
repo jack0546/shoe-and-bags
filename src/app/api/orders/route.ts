@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
       userPhone: phone || '',
       userAddress: address || '',
       productName,
+      productId: productId || null,
       amount: orderAmount,
       quantity: quantity || (cartItems?.reduce((acc: number, item: any) => acc + item.quantity, 0) || 1),
       selectedSize: selectedSize || null,
