@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebaseAdmin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, query, where, getDocs, doc, setDoc, arrayUnion } from 'firebase/firestore';
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_API_URL = 'https://api.paystack.co';
@@ -70,11 +70,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const existingOrderQuery = adminDb
-      .collection('orders')
-      .where('paymentReference', '==', reference)
-      .get();
-    const existingOrders = await existingOrderQuery;
+    const existingOrderQuery = query(
+      collection(db, 'orders'), 
+      where('paymentReference', '==', reference)
+    );
+    const existingOrders = await getDocs(existingOrderQuery);
 
     if (!existingOrders.empty) {
       return NextResponse.json({ received: true, message: 'Order already exists' });
@@ -101,15 +101,15 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
-    const orderDoc = await adminDb.collection('orders').add(orderData);
+    const orderDoc = await addDoc(collection(db, 'orders'), orderData);
 
     const uid = orderData.userId;
     if (!uid.startsWith('guest_')) {
-      await adminDb.collection('users').doc(uid).set({
-        orders: FieldValue.arrayUnion(orderDoc.id),
+      await setDoc(doc(db, 'users', uid), {
+        orders: arrayUnion(orderDoc.id),
       }, { merge: true });
 
-      await adminDb.collection('users').doc(uid).collection('orders').doc(orderDoc.id).set({
+      await setDoc(doc(db, 'users', uid, 'orders', orderDoc.id), {
         ...orderData,
         id: orderDoc.id,
       });

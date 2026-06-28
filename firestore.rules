@@ -30,10 +30,8 @@ service cloud.firestore {
     // ─── ORDERS COLLECTION ───────────────────────────────────────────
     match /orders/{orderId} {
 
-      // ✅ USER: Create their own order
-      allow create: if isAuthenticated()
-                    && isOwner(request.resource.data.userId)
-                    && request.resource.data.status == 'pending';
+      // Anyone can create an order (webhooks and authenticated users)
+      allow create: if request.resource.data.status == 'pending';
 
       // ✅ USER: Read only their own orders
       // ✅ ADMIN: Read ALL orders
