@@ -110,6 +110,11 @@ export async function POST(request: NextRequest) {
       orders: FieldValue.arrayUnion(orderDoc.id),
     }, { merge: true });
 
+    await adminDb.collection('users').doc(uid).collection('orders').doc(orderDoc.id).set({
+      ...orderData,
+      id: orderDoc.id,
+    });
+
     return NextResponse.json({ success: true, message: 'Order created successfully' });
   } catch (error) {
     console.error('Order creation error:', error);
@@ -134,16 +139,27 @@ export async function GET(request: NextRequest) {
     const userDoc = await adminDb.collection('users').doc(authResult.uid).get();
     const isAdmin = userDoc.exists && userDoc.data()?.role === 'admin';
 
-    const ordersRef = adminDb.collection('orders');
-    const q = isAdmin 
-      ? ordersRef.where('deleted', '!=', true).orderBy('createdAt', 'desc').get()
-      : ordersRef.where('userId', '==', authResult.uid).orderBy('createdAt', 'desc').get();
-
-    const snapshot = await q;
-    const orders = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    let orders;
+    if (isAdmin) {
+      const snapshot = await adminDb.collection('orders')
+        .where('deleted', '!=', true)
+        .orderBy('createdAt', 'desc')
+        .get();
+      orders = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    } else {
+      const snapshot = await adminDb.collection('users')
+        .doc(authResult.uid)
+        .collection('orders')
+        .orderBy('createdAt', 'desc')
+        .get();
+      orders = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    }
 
     return NextResponse.json({ success: true, orders });
   } catch (error) {
