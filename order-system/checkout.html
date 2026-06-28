@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout - Order Management</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <div class="logo">MyStore</div>
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="orders.html">My Orders</a></li>
+        <li><a href="#" id="adminLink" style="display:none;">Admin</a></li>
+        <li><a href="#" id="logoutBtn">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h1 class="mb-20">Checkout</h1>
+
+    <div id="authCheck" class="card">
+      <p>Please log in to continue with checkout.</p>
+      <a href="#" class="btn btn-primary mt-10" id="goToLogin">Go to Login</a>
+    </div>
+
+    <div id="checkoutForm" style="display:none;">
+      <div class="grid grid-2">
+        <div class="card">
+          <h2>Shipping Information</h2>
+          <form id="shippingForm">
+            <div class="form-group">
+              <label for="customerName">Full Name *</label>
+              <input type="text" id="customerName" required>
+            </div>
+            <div class="form-group">
+              <label for="email">Email *</label>
+              <input type="email" id="email" required>
+            </div>
+            <div class="form-group">
+              <label for="phone">Phone *</label>
+              <input type="tel" id="phone" required>
+            </div>
+            <div class="form-group">
+              <label for="address">Address *</label>
+              <textarea id="address" rows="2" required></textarea>
+            </div>
+            <div class="form-group">
+              <label for="city">City *</label>
+              <input type="text" id="city" required>
+            </div>
+            <div class="form-group">
+              <label for="paymentMethod">Payment Method *</label>
+              <select id="paymentMethod" required>
+                <option value="paystack">Paystack</option>
+                <option value="cash">Cash on Delivery</option>
+                <option value="bank">Bank Transfer</option>
+              </select>
+            </div>
+          </form>
+        </div>
+
+        <div>
+          <div class="card">
+            <h2>Order Summary</h2>
+            <div id="cartItems"></div>
+            <hr class="mt-20 mb-20">
+            <div class="flex justify-between mb-10">
+              <span>Subtotal</span>
+              <span id="subtotal">₦0.00</span>
+            </div>
+            <div class="flex justify-between mb-10">
+              <span>Delivery Fee</span>
+              <span id="deliveryFee">₦1,500.00</span>
+            </div>
+            <div class="flex justify-between mb-20" style="font-size:1.1rem; font-weight:bold;">
+              <span>Total</span>
+              <span id="total">₦0.00</span>
+            </div>
+            <button type="button" class="btn btn-primary" id="placeOrderBtn" style="width:100%;">
+              Place Order
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+    <div class="spinner"></div>
+  </div>
+
+  <script type="module" src="checkout.js"></script>
+</body>
+</html>

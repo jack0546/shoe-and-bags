@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, query, where, getDocs, doc, setDoc, arrayUnion } from 'firebase/firestore';
+import { adminDb, runAdminTransaction } from '@/lib/firebaseAdmin';
+import { Timestamp } from 'firebase-admin/firestore';
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_API_URL = 'https://api.paystack.co';
@@ -15,7 +15,7 @@ function verifyPaystackSignature(body: string, signature: string | null): boolea
   return signature === expectedSignature;
 }
 
-async function verifyPaymentWithPaystack(reference: string): Promise<{ valid: boolean; amount?: number; data?: any }> {
+async function verifyPaymentWithPaystack(reference: string): Promise<{ valid: boolean; amount?: number; paidAt?: string; gatewayResponse?: string }> {
   if (!PAYSTACK_SECRET_KEY) {
     console.error('PAYSTACK_SECRET_KEY not configured');
     return { valid: false };
@@ -37,7 +37,7 @@ async function verifyPaymentWithPaystack(reference: string): Promise<{ valid: bo
 
     const data = await response.json();
     if (data?.status && data?.data?.status === 'success') {
-      return { valid: true, amount: data.data.amount, data: data.data };
+      return { valid: true, amount: data.data.amount, paidAt: data.data.paid_at, gatewayResponse: data.data.gateway_response };
     }
     return { valid: false };
   } catch (error) {
@@ -57,12 +57,41 @@ export async function POST(request: NextRequest) {
   const payload = JSON.parse(body);
   const event = payload.event;
 
-  if (event !== 'charge.success') {
+  if (event !== 'charge.success' && event !== 'charge.failed') {
     return NextResponse.json({ received: true });
   }
 
   const data = payload.data;
   const { reference } = data;
+
+  if (event === 'charge.failed') {
+    if (!reference || !reference.startsWith('PAY-')) {
+      return NextResponse.json({ received: true });
+    }
+    try {
+      const orderId = reference.replace('PAY-', '');
+      await adminDb.collection('orders').doc(orderId).update({
+        paymentStatus: 'failed',
+        orderStatus: 'cancelled',
+        paystackFailedAt: Timestamp.now(),
+      });
+      await adminDb.collection('users').doc(data.metadata?.userId).collection('orders').doc(orderId).update({
+        paymentStatus: 'failed',
+        orderStatus: 'cancelled',
+        paystackFailedAt: Timestamp.now(),
+      });
+      return NextResponse.json({ received: true });
+    } catch (error) {
+      console.error('Error recording failure:', error);
+      return NextResponse.json({ received: true });
+    }
+  }
+
+  // charge.success handling
+  if (!reference || !reference.startsWith('PAY-')) {
+    return NextResponse.json({ error: 'Invalid reference format' }, { status: 400 });
+  }
+  const orderId = reference.replace('PAY-', '');
 
   const verification = await verifyPaymentWithPaystack(reference);
   if (!verification.valid) {
@@ -70,57 +99,71 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const existingOrderQuery = query(
-      collection(db, 'orders'), 
-      where('paymentReference', '==', reference)
-    );
-    const existingOrders = await getDocs(existingOrderQuery);
+    // Try orderId lookup (PAY-{orderId} format)
+    const orderRef = adminDb.collection('orders').doc(orderId);
+    const orderSnap = await orderRef.get();
 
-    if (!existingOrders.empty) {
-      return NextResponse.json({ received: true, message: 'Order already exists' });
+    if (!orderSnap.exists) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    const verifiedAmount = verification.amount ? verification.amount / 100 : 0;
-    const verifiedData = verification.data || data;
+    const orderData = orderSnap.data();
 
-    const orderData = {
-      userId: verifiedData?.metadata?.custom_fields?.find((f: any) => f.variable_name === 'user_id')?.value || `guest_${Date.now()}`,
-      userEmail: verifiedData?.customer?.email || '',
-      userName: verifiedData?.customer?.name || '',
-      userPhone: verifiedData?.metadata?.custom_fields?.find((f: any) => f.variable_name === 'phone')?.value || '',
-      userAddress: verifiedData?.metadata?.custom_fields?.find((f: any) => f.variable_name === 'address')?.value || '',
-      productName: verifiedData?.metadata?.custom_fields?.find((f: any) => f.variable_name === 'product')?.value || '',
-      productId: verifiedData?.metadata?.custom_fields?.find((f: any) => f.variable_name === 'product_slug')?.value || null,
-      amount: verifiedAmount,
-      quantity: parseInt(verifiedData?.metadata?.custom_fields?.find((f: any) => f.variable_name === 'quantity')?.value) || 1,
-      selectedSize: verifiedData?.metadata?.custom_fields?.find((f: any) => f.variable_name === 'size')?.value || null,
-      selectedColor: verifiedData?.metadata?.custom_fields?.find((f: any) => f.variable_name === 'color')?.value || null,
-      status: 'pending',
-      paymentReference: reference,
-      paymentStatus: 'success',
-      createdAt: new Date().toISOString(),
-    };
+    if (orderData?.paymentStatus === 'paid') {
+      return NextResponse.json({ received: true, message: 'Already processed' });
+    }
 
-    const orderDoc = await addDoc(collection(db, 'orders'), orderData);
+    const orderTotal = orderData?.total ?? orderData?.amount ?? 0;
+    const expectedAmount = Math.round(orderTotal * 100);
+    if (verification.amount !== expectedAmount) {
+      return NextResponse.json({ error: 'Amount mismatch' }, { status: 400 });
+    }
 
-    const uid = orderData.userId;
-    if (!uid.startsWith('guest_')) {
-      await setDoc(doc(db, 'users', uid), {
-        orders: arrayUnion(orderDoc.id),
-      }, { merge: true });
+    await runAdminTransaction(async (transaction) => {
+      const orderRef = adminDb.collection('orders').doc(orderId);
+      const orderSnapTx = await transaction.get(orderRef);
 
-      await setDoc(doc(db, 'users', uid, 'orders', orderDoc.id), {
-        ...orderData,
-        id: orderDoc.id,
+      if (!orderSnapTx.exists) {
+        throw new Error('Order not found');
+      }
+
+      const order = orderSnapTx.data()!;
+
+      for (const item of (order.items || [])) {
+        const productRef = adminDb.collection('products').doc(item.productId);
+        const productSnap = await transaction.get(productRef);
+
+        if (productSnap.exists) {
+          const currentStock = productSnap.data()?.stock || 0;
+          if (currentStock < item.quantity) {
+            throw new Error(`Insufficient stock for ${item.productName}`);
+          }
+          transaction.update(productRef, { stock: currentStock - item.quantity });
+        }
+      }
+
+      transaction.update(orderRef, {
+        paymentStatus: 'paid',
+        orderStatus: 'processing',
+        paidAt: Timestamp.now(),
+        paystackVerifiedAmount: verification.amount,
+        paystackVerifiedAt: verification.paidAt,
+        paystackGatewayResponse: verification.gatewayResponse,
       });
-    }
+
+      transaction.update(
+        adminDb.collection('users').doc(order.userId).collection('orders').doc(orderId),
+        {
+          paymentStatus: 'paid',
+          orderStatus: 'processing',
+          paidAt: Timestamp.now(),
+        }
+      );
+    });
 
     return NextResponse.json({ received: true });
   } catch (error: any) {
-    console.error('Error saving order:', error);
-    return NextResponse.json({ 
-      error: 'Failed to save order', 
-      details: error?.message || 'Unknown error' 
-    }, { status: 500 });
+    console.error('Error processing webhook:', error);
+    return NextResponse.json({ error: 'Processing error', details: error?.message || 'Unknown error' }, { status: 500 });
   }
 }

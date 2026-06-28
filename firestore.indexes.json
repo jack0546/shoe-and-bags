@@ -4,25 +4,10 @@
       "collectionGroup": "orders",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "userEmail", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "orders",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "orders",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "userId", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "orderStatus", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     }
-  ]
+  ],
+  "fieldOverrides": []
 }

@@ -17,7 +17,7 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isValidStatus() {
+    function isValidOrderStatus() {
       return request.resource.data.orderStatus in [
         'pending',
         'processing',
@@ -30,34 +30,39 @@ service cloud.firestore {
     // ─── ORDERS COLLECTION ───────────────────────────────────────────
     match /orders/{orderId} {
 
-      // Create only if orderStatus is pending
-      allow create: if request.resource.data.orderStatus == 'pending';
+      // Only authenticated users can create orders
+      allow create: if isAuthenticated() && request.resource.data.orderStatus == 'pending';
 
-      // ✅ USER: Read only their own orders
-      // ✅ ADMIN: Read ALL orders
+      // Read: owner or admin
       allow read: if isOwner(resource.data.userId) || isAdmin();
 
-      // ✅ ADMIN ONLY: Update any order (status, tracking, notes)
-      // ✅ USER: Can only cancel their own PENDING order
-      allow update: if isAdmin() && isValidStatus()
+      // Update: admin can update to any valid status
+      // Users can only cancel their own pending orders
+      allow update: if isAdmin() && isValidOrderStatus()
                     || (isOwner(resource.data.userId)
                         && resource.data.orderStatus == 'pending'
                         && request.resource.data.orderStatus == 'cancelled');
 
-      // ✅ ADMIN ONLY: Delete orders
+      // Delete: admin only
       allow delete: if isAdmin();
     }
 
     // ─── USERS COLLECTION ────────────────────────────────────────────
     match /users/{userId} {
-      allow read, write: if isOwner(userId) || isAdmin();
+      // Users can read their own doc, admins can read/write all
+      // Users CANNOT write to their own doc (prevents privilege escalation)
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isAdmin();
     }
 
     // ─── USER ORDERS SUBCOLLECTION ───────────────────────────────────
     match /users/{userId}/orders/{orderId} {
       // Owner can read, admin can read/write
+      // Users cannot create/delete in subcollection directly
       allow read: if isOwner(userId) || isAdmin();
-      allow write: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // ─── PRODUCTS COLLECTION ─────────────────────────────────────────

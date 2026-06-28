@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Order Management</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <div class="logo">Admin Panel</div>
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="orders.html">My Orders</a></li>
+        <li><a href="admin.html">Dashboard</a></li>
+        <li><a href="#" id="logoutBtn">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h1 class="mb-20">Admin Dashboard</h1>
+
+    <div class="grid grid-4" id="statsGrid">
+      <div class="stat-card">
+        <div class="stat-value" id="totalOrders">0</div>
+        <div class="stat-label">Total Orders</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="totalSales">₦0</div>
+        <div class="stat-label">Total Sales</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="pendingOrders">0</div>
+        <div class="stat-label">Pending</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="deliveredOrders">0</div>
+        <div class="stat-label">Delivered</div>
+      </div>
+    </div>
+
+    <div class="card mt-20">
+      <div class="flex justify-between mb-20">
+        <h2>All Orders</h2>
+        <button class="btn btn-sm btn-secondary" id="exportBtn">Export CSV</button>
+      </div>
+
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="Search by order ID or customer name...">
+        <select id="statusFilter">
+          <option value="all">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="processing">Processing</option>
+          <option value="shipped">Shipped</option>
+          <option value="delivered">Delivered</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+
+      <div id="ordersTable">
+        <div class="spinner"></div>
+      </div>
+
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </main>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+    <div class="spinner"></div>
+  </div>
+
+  <script type="module" src="admin-orders.js"></script>
+</body>
+</html>

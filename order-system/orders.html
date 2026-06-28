@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Orders - Order Management</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <div class="logo">MyStore</div>
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="orders.html">My Orders</a></li>
+        <li><a href="#" id="adminLink" style="display:none;">Admin</a></li>
+        <li><a href="#" id="logoutBtn">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="flex justify-between mb-20">
+      <h1>My Orders</h1>
+      <span id="orderCount" class="badge badge-processing">0 orders</span>
+    </div>
+
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="Search by order ID...">
+      <select id="statusFilter">
+        <option value="all">All Status</option>
+        <option value="pending">Pending</option>
+        <option value="processing">Processing</option>
+        <option value="shipped">Shipped</option>
+        <option value="delivered">Delivered</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+
+    <div id="ordersTable">
+      <div class="spinner"></div>
+    </div>
+
+    <div class="pagination" id="pagination"></div>
+  </main>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+    <div class="spinner"></div>
+  </div>
+
+  <script type="module" src="order-history.js"></script>
+</body>
+</html>

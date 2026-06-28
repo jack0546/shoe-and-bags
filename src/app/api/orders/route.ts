@@ -97,9 +97,9 @@ export async function POST(request: NextRequest) {
       quantity: quantity || (cartItems?.reduce((acc: number, item: any) => acc + item.quantity, 0) || 1),
       selectedSize: selectedSize || null,
       selectedColor: selectedColor || null,
-      status: 'pending',
+      orderStatus: 'pending',
       paymentReference: paymentReference || '',
-      paymentStatus: 'success',
+      paymentStatus: 'pending',
       createdAt: new Date().toISOString(),
       cartItems: cartItems || null,
     };
@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
     let orders;
     if (isAdmin) {
       const snapshot = await adminDb.collection('orders')
-        .where('deleted', '!=', true)
+        .where('orderStatus', '!=', 'cancelled')
         .orderBy('createdAt', 'desc')
         .get();
       orders = snapshot.docs.map(doc => ({
@@ -153,6 +153,7 @@ export async function GET(request: NextRequest) {
       const snapshot = await adminDb.collection('users')
         .doc(authResult.uid)
         .collection('orders')
+        .where('orderStatus', '!=', 'cancelled')
         .orderBy('createdAt', 'desc')
         .get();
       orders = snapshot.docs.map(doc => ({
@@ -233,24 +234,24 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { status, trackingNumber, carrier, estimatedDelivery, notes } = body;
+    const { orderStatus, trackingNumber, carrier, estimatedDelivery, notes } = body;
 
-    const allowedStatuses = ['pending', 'processing', 'shipped', 'delivered'];
-    if (status && !allowedStatuses.includes(status)) {
+    const allowedStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+    if (orderStatus && !allowedStatuses.includes(orderStatus)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
 
     const updateData: any = {};
-    if (status) updateData.status = status;
+    if (orderStatus) updateData.orderStatus = orderStatus;
     if (trackingNumber !== undefined) updateData.trackingNumber = trackingNumber;
     if (carrier !== undefined) updateData.carrier = carrier;
     if (estimatedDelivery !== undefined) updateData.estimatedDelivery = estimatedDelivery;
     if (notes !== undefined) updateData.notes = notes;
 
-    if (status === 'shipped') {
+    if (orderStatus === 'shipped') {
       updateData.shippedAt = new Date().toISOString();
     }
-    if (status === 'delivered') {
+    if (orderStatus === 'delivered') {
       updateData.deliveredAt = new Date().toISOString();
     }
 
@@ -259,12 +260,12 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    const existingHistory = orderSnap.data()?.statusHistory || [];
-    if (status) {
-      updateData.statusHistory = [
+    const existingHistory = orderSnap.data()?.orderStatusHistory || [];
+    if (orderStatus) {
+      updateData.orderStatusHistory = [
         ...existingHistory,
         {
-          status,
+          orderStatus,
           timestamp: new Date().toISOString(),
           note: notes || undefined,
         },

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shopping Cart - MyStore</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <div class="logo">MyStore</div>
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="products.html">Products</a></li>
+        <li><a href="cart.html">Cart</a></li>
+        <li><a href="orders.html">My Orders</a></li>
+        <li><a href="#" id="adminLink" style="display:none;">Admin</a></li>
+        <li><a href="#" id="logoutBtn" style="display:none;">Logout</a></li>
+        <li><a href="login.html" id="loginBtn">Login</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h1 class="mb-20">Shopping Cart</h1>
+
+    <div class="grid grid-2">
+      <div>
+        <div class="card" id="cartItems">
+          <div class="spinner"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <h2>Summary</h2>
+          <div class="flex justify-between mb-10">
+            <span>Subtotal</span>
+            <span id="subtotal">₦0.00</span>
+          </div>
+          <div class="flex justify-between mb-10">
+            <span>Delivery Fee</span>
+            <span id="deliveryFee">₦1,500.00</span>
+          </div>
+          <div class="flex justify-between mb-20" style="font-size:1.1rem;font-weight:bold;">
+            <span>Total</span>
+            <span id="total">₦0.00</span>
+          </div>
+          <a href="checkout.html" class="btn btn-primary" style="width:100%;">Proceed to Checkout</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+    <div class="spinner"></div>
+  </div>
+
+  <script type="module" src="cart.js"></script>
+</body>
+</html>

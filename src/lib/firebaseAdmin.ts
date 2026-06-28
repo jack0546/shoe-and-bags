@@ -23,3 +23,7 @@ export async function verifyIdToken(token: string) {
     return { success: false, error: error.message };
   }
 }
+
+export async function runAdminTransaction<T>(callback: (transaction: FirebaseFirestore.Transaction) => Promise<T>): Promise<T> {
+  return await adminDb.runTransaction(callback);
+}

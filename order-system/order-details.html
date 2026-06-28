@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Details - Order Management</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <div class="logo">MyStore</div>
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="orders.html">My Orders</a></li>
+        <li><a href="#" id="adminLink" style="display:none;">Admin</a></li>
+        <li><a href="#" id="logoutBtn">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="flex justify-between mb-20">
+      <h1>Order Details</h1>
+      <a href="orders.html" class="btn btn-secondary">← Back to Orders</a>
+    </div>
+
+    <div id="orderContent">
+      <div class="spinner"></div>
+    </div>
+  </main>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+    <div class="spinner"></div>
+  </div>
+
+  <script type="module" src="order-details.js"></script>
+</body>
+</html>
