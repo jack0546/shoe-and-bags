@@ -15,6 +15,7 @@ import {
   writeBatch,
   initializePayment,
   createCashOrder,
+  db,
 } from "./firebase.js";
 
 // ─── STATE ──────────────────────────────────────────────────────────
